@@ -1,7 +1,21 @@
 require 'uri'
+require_relative "params_helper"  #warning: monkey-patches Hash
 
 module Phase5
   class Params
+
+    def self.parse_www_encoded_form(form)
+      return nil if form.nil?
+      a = URI.decode_www_form(form)
+      out = {}
+      a.each do |tuple|
+        k, v = tuple
+        out.merge!({k => v})
+      end
+
+      out
+
+    end
     # use your initialize to merge params from
     # 1. query string
     # 2. post body
@@ -10,10 +24,23 @@ module Phase5
     # You haven't done routing yet; but assume route params will be
     # passed in as a hash to `Params.new` as below:
     def initialize(req, route_params = {})
-      @params = {}
-      parse_www_encoded_form(req.query_string)
-      parse_www_encoded_form(req.body)
-      @params.keys.map!(&:to_s)
+      @params = Hash.new
+
+      query_string_params = self.class.parse_www_encoded_form(req.query_string)
+      @params.merge! query_string_params unless query_string_params.nil?
+
+      body_params = self.class.parse_www_encoded_form(req.body)
+      @params.merge! body_params unless body_params.nil?
+
+      route_params = route_params.reduce({}) do |out, tuple|
+        k, v = tuple
+        out.merge({k.to_s => v})
+      end
+
+      @params.merge! route_params
+
+      nest_hash!
+
     end
 
     def [](key)
@@ -33,30 +60,17 @@ module Phase5
     # user[address][street]=main&user[address][zip]=89436
     # should return
     # { "user" => { "address" => { "street" => "main", "zip" => "89436" } } }
-    def parse_www_encoded_form(form)
-      return nil if form.nil?
-      a = URI.decode_www_form(form)
-      p a
-      out = {}
-      a.each do |tuple|
-        p tuple
-        k, v = tuple
-        out.merge!({k => v})
-      end
-      p out
-      @params.merge! out
 
-      nil
-    end
 
-    def nest_hash
+    def nest_hash!
       new_params = {}
-      @params.each do |param_key, param_val|
-        if strip_key = param_key.gsub("]","")
-          new_key = unnest_key(strip_key)
+      @params.each_pair do |tuple|
+        hashed_param = unnest_key(*tuple)
+        new_params = deep_merge(new_params, hashed_param)
+      end
 
-        else
-        new_params.merge!({param_key => param_val})
+      @params = new_params
+    end
 
 
     # this should return an array
