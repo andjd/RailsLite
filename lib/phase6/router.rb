@@ -21,7 +21,7 @@ module Phase6
       r = Regexp.new(@pattern)
       rr = r.match(req.path)
       route_params = Hash[*(rr.names.zip(rr.captures).flatten)]
-      
+
       cc = controller_class.new(req, res, route_params)
       cc.invoke_action(action_name)
 
@@ -57,7 +57,7 @@ module Phase6
     # should return the route that matches this request
     def match(req)
       @routes.find do |r|
-        return r if r.matches?(req)
+        r.matches?(req)
       end
 
     end
